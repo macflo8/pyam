@@ -810,32 +810,22 @@ class IamDataFrame(object):
         subregions = subregions or self._all_other_regions(region, variable)
 
         subregion_df = self.filter(region=subregions)
-        cols = ['region', 'variable']
-        
-        weightvar_df = subregion_df.filter(variable=weight).data
 
-        if weightvar_df.empty:
-            msg = "cannot aggregate because no data found "\
-                "or weight_var='{}'"
-            logger().error(msg.format(weight))
-            return
-        var_df = subregion_df.filter(variable=variable).data
-        # _data = _aggregate(var_df, cols,
-        #                    method='w.avg', weightvar_df=weightvar_df)
-        cols = [c for c in list(var_df.columns) if c not in ['value'] + cols]
-        calcdf = pd.merge(var_df, weightvar_df,
-                          how='left', suffixes=('', '_weight'),
-                          left_on=['model', 'scenario', 'region', 'year'],
-                          right_on=['model', 'scenario', 'region', 'year'])
-        calcdf['value'] = calcdf['value'] * calcdf['value_weight']
-        calcdf = calcdf.groupby(cols)['value', 'value_weight'].agg(np.sum)
-        calcdf['value'] = calcdf['value'] / calcdf['value_weight']
-        _data = calcdf.drop('value_weight', axis=1)
-        # append?
+        _data = subregion_df._get_value_col(YEAR_IDX, variable=variable)
+        _weight = subregion_df._get_value_col(YEAR_IDX, variable=weight)
+
+        cols = META_IDX + ['year']
+        _data = (_data * _weight).groupby(cols).sum() / \
+            _weight.groupby(cols).sum()
+
         if append is True:
             self.append(_data, region=region, variable=variable, inplace=True)
         else:
             return _data
+
+    def _get_value_col(self, cols, **kwargs):
+        """Return the value column as `pd.Series"""
+        return self.filter(**kwargs).data.set_index(cols)['value']
 
     def aggregate_region(self, variable, region='World', subregions=None,
                          components=None, append=False):
@@ -894,7 +884,6 @@ class IamDataFrame(object):
         """Determine subregions as all regions other than `region`"""
         rows = self._apply_filters(variable=variable)
         return set(self.data[rows].region) - set([region])
-
 
     def check_aggregate_region(self, variable, region='World', subregions=None,
                                components=None, exclude_on_fail=False,
