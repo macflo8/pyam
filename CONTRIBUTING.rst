@@ -11,6 +11,23 @@ Have a question? Get in touch!
 .. _`email`: mailto:pyam+owner@groups.io?subject=[pyam]%20Please%20add%20me%20to%20the%20Slack%20workspace
 .. _Slack: https://slack.com
 
+|git-logo| |groups.io-logo| |slack-logo|
+
+.. |git-logo| image:: _static/github-logo.png
+   :alt: GitHub logo
+   :target: http://github.com/IAMconsortium/pyam
+   :width: 30%
+
+.. |groups.io-logo| image:: _static/groups.io-logo.png
+   :alt: groups.io logo
+   :target: https://groups.io/g/pyam
+   :width: 30%
+
+.. |slack-logo| image:: _static/Slack_RGB.png
+   :alt: Slack logo
+   :target: https://slack.com
+   :width: 30%
+
 
 Interested in Contributing? Welcome to the team!
 ------------------------------------------------
