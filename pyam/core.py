@@ -26,7 +26,6 @@ except (ImportError, AttributeError):
     has_ix = False
 
 from pyam import plotting
-from pyam.logging import deprecation_warning
 from pyam.run_control import run_control
 from pyam.utils import (
     write_sheet,
@@ -91,7 +90,7 @@ class IamDataFrame(object):
     Calling the class with :code:`meta_sheet_name=False` will
     skip the import of the 'meta' table.
     """
-    def __init__(self, data, **kwargs): 
+    def __init__(self, data, **kwargs):
         """Initialize an instance of an IamDataFrame"""
         # import data from pd.DataFrame or read from source
         if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
@@ -1136,7 +1135,6 @@ class IamDataFrame(object):
         """Return list of regions other than `region` containing `variable`"""
         rows = self._apply_filters(variable=variable)
         return set(self.data[rows].region) - set([region])
-
 
     def _variable_components(self, variable, level=0):
         """Get all components (sub-categories) of a variable for a given level
