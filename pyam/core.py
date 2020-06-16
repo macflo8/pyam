@@ -91,7 +91,7 @@ class IamDataFrame(object):
     Calling the class with :code:`meta_sheet_name=False` will
     skip the import of the 'meta' table.
     """
-    def __init__(self, data, **kwargs):
+    def __init__(self, data, **kwargs): 
         """Initialize an instance of an IamDataFrame"""
         # import data from pd.DataFrame or read from source
         if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
@@ -1269,16 +1269,16 @@ class IamDataFrame(object):
                 keep_col = pattern_match(self.data[col], values, level, regexp)
 
             elif col == 'year':
-                _data = self.data[col] if self.time_col is not 'time' \
+                _data = self.data[col] if self.time_col != 'time' \
                     else self.data['time'].apply(lambda x: x.year)
                 keep_col = years_match(_data, values)
 
-            elif col == 'month' and self.time_col is 'time':
+            elif col == 'month' and self.time_col == 'time':
                 keep_col = month_match(self.data['time']
                                            .apply(lambda x: x.month),
                                        values)
 
-            elif col == 'day' and self.time_col is 'time':
+            elif col == 'day' and self.time_col == 'time':
                 if isinstance(values, str):
                     wday = True
                 elif isinstance(values, list) and isinstance(values[0], str):
@@ -1293,12 +1293,12 @@ class IamDataFrame(object):
 
                 keep_col = day_match(days, values)
 
-            elif col == 'hour' and self.time_col is 'time':
+            elif col == 'hour' and self.time_col == 'time':
                 keep_col = hour_match(self.data['time']
                                           .apply(lambda x: x.hour),
                                       values)
 
-            elif col == 'time' and self.time_col is 'time':
+            elif col == 'time' and self.time_col == 'time':
                 keep_col = datetime_match(self.data[col], values)
 
             elif col == 'level':
@@ -1720,7 +1720,7 @@ def _check_rows(rows, check, in_range=True, return_test='any'):
         if bd in check:
             check_idx.append(set(rows.index[op(check[bd])]))
 
-    if return_test is 'any':
+    if return_test == 'any':
         ret = where_idx & set.union(*check_idx)
     elif return_test == 'all':
         ret = where_idx if where_idx == set.intersection(*check_idx) else set()
@@ -1861,7 +1861,7 @@ def filter_by_meta(data, df, join_meta=False, **kwargs):
     apply_filter = False
     for col, values in kwargs.items():
         if col in META_IDX and values is not None:
-            _col = meta.index.get_level_values(0 if col is 'model' else 1)
+            _col = meta.index.get_level_values(0 if col == 'model' else 1)
             keep &= pattern_match(_col, values, has_nan=False)
             apply_filter = True
         elif values is not None:
