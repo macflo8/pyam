@@ -1090,8 +1090,8 @@ class IamDataFrame(object):
             df.meta = self.meta.loc[_make_index(df.data)]
             return df
 
-    def downscale_region(self, variable, proxy, region='World',
-                         subregions=None, append=False):
+    def downscale_region(self, variable, proxy='None', region='World',
+                         weight='None', subregions=None, append=False):
         """Downscale a timeseries to a number of subregions
 
         Parameters
@@ -1099,7 +1099,12 @@ class IamDataFrame(object):
         variable : str or list of str
             variable(s) to be downscaled
         proxy : str
-            variable to be used as proxy (i.e, weight) for the downscaling
+            variable within the IamDataFrame to be used as proxy for the 
+            downscaling, optional
+        weight : dataframe
+            weighting dataframe outside the IamDataFrame that can be fed 
+            into the downscale function. Index = subregions, columns = year,
+            optional
         region : str, default 'World'
             region from which data will be downscaled
         subregions : list of str
@@ -1112,10 +1117,20 @@ class IamDataFrame(object):
         subregions = subregions or self._all_other_regions(region)
 
         # filter relevant data, transform to `pd.Series` with appropriate index
-        _df = self.data[self._apply_filters(variable=proxy, region=subregions)]
-        _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
-        _total = _df.groupby(self._get_cols([self.time_col])).value.sum()
-
+        if proxy is not None and weight is not None:
+            raise ValueError(
+                'Using both `proxy` and `weight` arguments is not valid') 
+            elif proxy is not None:                 
+            _df = self.data[self._apply_filters(variable=proxy, region=subregions)]
+            _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
+            _total = _df.groupby(self._get_cols([self.time_col])).value.sum()
+            elif weight is not None:
+            _df = self.data[self._apply_filters(variable=weights, region=subregions)]
+            _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
+            _total = _df.groupby(self._get_cols([self.time_col])).value.sum()
+        else:
+            raise ValueError('Either `proxy` or `weight` arguments is required)
+                                                           
         _value = (
             self.data[self._apply_filters(variable=variable, region=region)]
             .set_index(self._get_cols(['variable', 'unit', self.time_col]))
