@@ -1098,13 +1098,12 @@ class IamDataFrame(object):
         ----------
         variable : str or list of str
             variable(s) to be downscaled
-        proxy : str
-            variable within the IamDataFrame to be used as proxy for the 
-            downscaling, optional
-        weight : dataframe
-            weighting dataframe outside the IamDataFrame that can be fed 
-            into the downscale function. Index = subregions, columns = time_col,
-            optional
+        proxy : str, optional
+            variable (within the :class:`IamDataFrame`) to be used as proxy
+            for regional downscaling
+        weight : class:`pandas.DataFrame`, optional
+            dataframe with time dimension as columns (year or
+            :class:`datetime.datetime`) and regions[, model, scenario] as index
         region : str, default 'World'
             region from which data will be downscaled
         subregions : list of str
