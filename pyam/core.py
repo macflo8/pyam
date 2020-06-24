@@ -1128,7 +1128,7 @@ class IamDataFrame(object):
             _proxy = _weight.set_index(self._get_cols(['region', self.time_col])).value
             _total = _weight.groupby(self._get_cols([self.time_col])).value.sum()
         else:
-            raise ValueError('Either `proxy` or `weight` arguments is required)
+            raise ValueError('Either `proxy` or `weight` arguments is required')
                                                            
         _value = (
             self.data[self._apply_filters(variable=variable, region=region)]
