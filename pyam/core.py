@@ -1103,7 +1103,7 @@ class IamDataFrame(object):
             downscaling, optional
         weight : dataframe
             weighting dataframe outside the IamDataFrame that can be fed 
-            into the downscale function. Index = subregions, columns = year,
+            into the downscale function. Index = subregions, columns = time_col,
             optional
         region : str, default 'World'
             region from which data will be downscaled
@@ -1120,14 +1120,13 @@ class IamDataFrame(object):
         if proxy is not None and weight is not None:
             raise ValueError(
                 'Using both `proxy` and `weight` arguments is not valid') 
-            elif proxy is not None:                 
+        elif proxy is not None:                 
             _df = self.data[self._apply_filters(variable=proxy, region=subregions)]
             _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
             _total = _df.groupby(self._get_cols([self.time_col])).value.sum()
-            elif weight is not None:
-            _df = self.data[self._apply_filters(variable=weights, region=subregions)]
-            _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
-            _total = _df.groupby(self._get_cols([self.time_col])).value.sum()
+        elif weight is not None:
+            _proxy = _weight.set_index(self._get_cols(['region', self.time_col])).value
+            _total = _weight.groupby(self._get_cols([self.time_col])).value.sum()
         else:
             raise ValueError('Either `proxy` or `weight` arguments is required)
                                                            
