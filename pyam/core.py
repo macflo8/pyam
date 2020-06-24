@@ -1125,8 +1125,8 @@ class IamDataFrame(object):
             _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
             _total = _df.groupby(self._get_cols([self.time_col])).value.sum()
         elif weight is not None:
-            _proxy = weight.set_index(self._get_cols(['region', self.time_col])).value
-            _total = weight.groupby(self._get_cols([self.time_col])).value.sum()
+            _proxy = weight.stack()
+            _total = _proxy.groupby(self.time_col).sum()
         else:
             raise ValueError('Either `proxy` or `weight` arguments is required')
                                                            
