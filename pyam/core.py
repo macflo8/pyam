@@ -1090,8 +1090,8 @@ class IamDataFrame(object):
             df.meta = self.meta.loc[_make_index(df.data)]
             return df
 
-    def downscale_region(self, variable, proxy='None', region='World',
-                         weight='None', subregions=None, append=False):
+    def downscale_region(self, variable, proxy=None, region='World',
+                         weight=None, subregions=None, append=False):
         """Downscale a timeseries to a number of subregions
 
         Parameters
