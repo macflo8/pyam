@@ -1108,26 +1108,30 @@ class IamDataFrame(object):
             region from which data will be downscaled
         subregions : list of str
             list of subregions, defaults to all regions other than `region`
+            (if using `proxy`) or `region` index (if using `weight`)
         append : bool, default False
             append the downscaled timeseries to `self` and return None,
             else return downscaled data as new IamDataFrame
         """
-        # get default subregions if not specified
-        subregions = subregions or self._all_other_regions(region)
-
-        # filter relevant data, transform to `pd.Series` with appropriate index
         if proxy is not None and weight is not None:
             raise ValueError(
                 'Using both `proxy` and `weight` arguments is not valid') 
-        elif proxy is not None:                 
-            _df = self.data[self._apply_filters(variable=proxy, region=subregions)]
-            _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
+        elif proxy is not None:
+            # get default subregions if not specified
+            subregions = subregions or self._all_other_regions(region)
+            rows = self._apply_filters(variable=proxy, region=subregions)
+            cols = self._get_cols(['region', self.time_col])
+            _proxy = self.data[rows].set_index(cols).value
         elif weight is not None:
-            # only use data related to subregions
-            rows = weight.index.isin(subregions, level='region')
+            # downselect weight to subregions or remove `region` from index
+            if subregions is not None:
+                rows = weight.index.isin(subregions, level='region')
+            else:
+                rows = ~weight.index.isin([region], level='region')
             _proxy = weight[rows].stack()
         else:
-            raise ValueError('Either `proxy` or `weight` arguments is required')
+            raise ValueError(
+                'Either `proxy` or `weight` arguments is required')
                                                            
         _value = (
             self.data[self._apply_filters(variable=variable, region=region)]
