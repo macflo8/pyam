@@ -1122,12 +1122,10 @@ class IamDataFrame(object):
         elif proxy is not None:                 
             _df = self.data[self._apply_filters(variable=proxy, region=subregions)]
             _proxy = _df.set_index(self._get_cols(['region', self.time_col])).value
-            _total = _df.groupby(self._get_cols([self.time_col])).value.sum()
         elif weight is not None:
             # only use data related to subregions
             rows = weight.index.isin(subregions, level='region')
             _proxy = weight[rows].stack()
-            _total = _proxy.groupby(self.time_col).sum()
         else:
             raise ValueError('Either `proxy` or `weight` arguments is required')
                                                            
@@ -1138,6 +1136,7 @@ class IamDataFrame(object):
         )
 
         # compute downscaled data
+        _total = _proxy.groupby(self.time_col).sum()
         _data = _value * _proxy / _total
 
         if append is True:
