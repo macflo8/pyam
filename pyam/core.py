@@ -137,7 +137,7 @@ class IamDataFrame(object):
         _df, self.time_col, self.extra_cols = _data
         self._LONG_IDX = IAMC_IDX + [self.time_col] + self.extra_cols
         # cast time_col to desired format
-        self._data = _df.set_index(self._LONG_IDX).values
+        self._data = _df.set_index(self._LONG_IDX).value
 
         # define `meta` dataframe for categorization & quantitative indicators
         self.meta = (
@@ -205,7 +205,7 @@ class IamDataFrame(object):
     def data(self, df):
         """Set the timeseries data from a long :class:`pandas.DataFrame`"""
         self._data = format_time_col(df, self.time_col)\
-            .set_index(self._LONG_IDX).values
+            .set_index(self._LONG_IDX).value
 
     def copy(self):
         """Make a deepcopy of this object
