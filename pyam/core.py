@@ -32,9 +32,9 @@ from pyam.utils import (
     read_file,
     read_pandas,
     format_data,
+    format_time_col,
     sort_data,
     merge_meta,
-    to_int,
     find_depth,
     pattern_match,
     years_match,
@@ -55,13 +55,14 @@ from pyam.plotting import mpl_args_to_meta_cols
 from pyam._aggregate import _aggregate, _aggregate_region, _aggregate_time,\
     _aggregate_recursive, _group_and_agg
 from pyam.units import convert_unit
+from pyam.index import get_index_levels
 from pyam.logging import deprecation_warning
 
 logger = logging.getLogger(__name__)
 
 
 class IamDataFrame(object):
-    """Scenario timeseries data
+    """Scenario timeseries data following the IAMC-structure
 
     The class provides a number of diagnostic features (including validation of
     data, completeness of variables provided), processing tools (e.g.,
@@ -117,6 +118,9 @@ class IamDataFrame(object):
 
     def _init(self, data, **kwargs):
         """Process data and set attributes for new instance"""
+        # pop kwarg for meta_sheet_name (prior to reading data from file)
+        meta_sheet = kwargs.pop('meta_sheet_name', 'meta')
+
         # import data from pd.DataFrame or read from source
         if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
             meta = kwargs.pop('meta') if 'meta' in kwargs else None
@@ -130,17 +134,18 @@ class IamDataFrame(object):
             logger.info('Reading file `{}`'.format(data))
             _data = read_file(data, **kwargs)
 
-        self.data, self.time_col, self.extra_cols = _data
-        # cast time_col to desired format
-        if self.time_col == 'year':
-            self._format_year_col()
-        elif self.time_col == 'time':
-            self._format_datetime_col()
-
+        _df, self.time_col, self.extra_cols = _data
         self._LONG_IDX = IAMC_IDX + [self.time_col] + self.extra_cols
+        # cast time_col to desired format
+        self._data = _df.set_index(self._LONG_IDX)
 
         # define `meta` dataframe for categorization & quantitative indicators
-        self.meta = self.data[META_IDX].drop_duplicates().set_index(META_IDX)
+        self.meta = (
+            pd.DataFrame(zip(self._data.index.get_level_values(0),
+                             self._data.index.get_level_values(1)),
+                         columns=META_IDX)
+            .drop_duplicates().set_index(META_IDX)
+        )
         self.reset_exclude()
 
         # merge meta dataframe (if given in kwargs)
@@ -149,7 +154,6 @@ class IamDataFrame(object):
                                    self.meta, ignore_meta_conflict=True)
 
         # if initializing from xlsx, try to load `meta` table from file
-        meta_sheet = kwargs.get('meta_sheet_name', 'meta')
         if isstr(data) and data.endswith('.xlsx') and meta_sheet is not False\
                 and meta_sheet in pd.ExcelFile(data).sheet_names:
             self.load_meta(data, sheet_name=meta_sheet)
@@ -157,12 +161,6 @@ class IamDataFrame(object):
         # execute user-defined code
         if 'exec' in run_control():
             self._execute_run_control()
-
-    def _format_year_col(self):
-        self.data['year'] = to_int(pd.to_numeric(self.data['year']))
-
-    def _format_datetime_col(self):
-        self.data['time'] = pd.to_datetime(self.data['time'])
 
     def __getitem__(self, key):
         _key_check = [key] if isstr(key) else key
@@ -196,6 +194,19 @@ class IamDataFrame(object):
                 f = getattr(mod, func)
                 f(self)
 
+    @property
+    def data(self):
+        """Return the timeseries data as long :class:`pandas.DataFrame`"""
+        if self.empty:  # reset_index fails on empty with `datetime` column
+            return pd.DataFrame([], columns=self._LONG_IDX + ['value'])
+        return self._data.reset_index()
+
+    @data.setter
+    def data(self, df):
+        """Set the timeseries data from a long :class:`pandas.DataFrame`"""
+        self._data = format_time_col(df, self.time_col)\
+            .set_index(self._LONG_IDX)
+
     def copy(self):
         """Make a deepcopy of this object
 
@@ -214,7 +225,7 @@ class IamDataFrame(object):
     @property
     def empty(self):
         """Indicator whether this object is empty"""
-        return self.data.empty
+        return self._data.empty
 
     def equals(self, other):
         """Test if two objects contain the same data and meta indicators
@@ -247,7 +258,7 @@ class IamDataFrame(object):
 
     def regions(self):
         """Get a list of regions"""
-        return pd.Series(self.data['region'].unique(), name='region')
+        return pd.Series(get_index_levels(self._data, 'region'), name='region')
 
     def variables(self, include_units=False):
         """Get a list of variables
@@ -257,11 +268,18 @@ class IamDataFrame(object):
         include_units : boolean, default False
             include the units
         """
-        if include_units:
-            return self.data[['variable', 'unit']].drop_duplicates()\
-                .reset_index(drop=True).sort_values('variable')
-        else:
-            return pd.Series(self.data.variable.unique(), name='variable')
+        if not include_units:
+            _var = 'variable'
+            return pd.Series(get_index_levels(self._data, _var), name=_var)
+
+        # else construct dataframe from variable and unit levels
+        return (
+            pd.DataFrame(zip(self._data.index.get_level_values('variable'),
+                             self._data.index.get_level_values('unit')),
+                         columns=['variable', 'unit'])
+            .drop_duplicates().sort_values('variable').reset_index(drop=True)
+        )
+
 
     def append(self, other, ignore_meta_conflict=False, inplace=False,
                **kwargs):
@@ -397,14 +415,16 @@ class IamDataFrame(object):
 
         ret = self.copy() if not inplace else self
 
-        ret.data["year"] = ret.data["time"].apply(lambda x: x.year)
-        ret.data = ret.data.drop("time", axis="columns")
+        _data = ret.data
+        _data["year"] = _data["time"].apply(lambda x: x.year)
+        _data = _data.drop("time", axis="columns")
         ret._LONG_IDX = [v if v != "time" else "year" for v in ret._LONG_IDX]
 
-        if any(ret.data[ret._LONG_IDX].duplicated()):
+        if any(_data[ret._LONG_IDX].duplicated()):
             error_msg = ('swapping time for year will result in duplicate '
                          'rows in `data`!')
             raise ValueError(error_msg)
+        ret._data = _data.set_index(IAMC_IDX)
 
         if not inplace:
             return ret
@@ -683,7 +703,7 @@ class IamDataFrame(object):
         When renaming models or scenarios, the uniqueness of the index must be
         maintained, and the function will raise an error otherwise.
 
-        Renaming is only applied to any data where a filter matches for all
+        Renaming is only applied to any data row that matches for all
         columns given in `mapping`. Renaming can only be applied to the `model`
         and `scenario` columns, or to other data columns simultaneously.
 
@@ -742,7 +762,9 @@ class IamDataFrame(object):
         idx = ret.meta.index.isin(_make_index(ret.data[rows]))
 
         # if `check_duplicates`, do the rename on a copy until after the check
-        _data = ret.data.copy() if check_duplicates else ret.data
+        # _data = ret.data.copy() if check_duplicates else ret.data
+        # TODO reactivate this avoidance of creating a copy
+        _data = ret.data
 
         # apply renaming changes
         for col, _mapping in mapping.items():
@@ -1006,8 +1028,12 @@ class IamDataFrame(object):
 
         # else, append to `self` or return as `IamDataFrame`
         if append is True:
-            self.append(_df, region=region, inplace=True)
+            if not _df.empty:
+                self.append(_df, region=region, inplace=True)
         else:
+            # TODO remove this line after data refactoring
+            if _df.empty:
+                return _empty_iamframe(self._LONG_IDX + ['value'])
             return IamDataFrame(_df, region=region, meta=self.meta)
 
     def check_aggregate_region(self, variable, region='World', subregions=None,
@@ -1266,7 +1292,9 @@ class IamDataFrame(object):
         _keep = self._apply_filters(**kwargs)
         _keep = _keep if keep else ~_keep
         ret = self.copy() if not inplace else self
-        ret.data = ret.data[_keep]
+        # TODO remove cast to list after refactoring `_apply_filters()`
+        ret._data = ret._data[list(_keep)]
+        ret._data.index = ret._data.index.remove_unused_levels()
 
         idx = _make_index(ret.data)
         if len(idx) == 0:
@@ -1295,14 +1323,16 @@ class IamDataFrame(object):
                 continue
 
             if col in self.meta.columns:
-                matches = pattern_match(self.meta[col], values, regexp=regexp)
+                matches = pattern_match(self.meta[col], values, regexp=regexp,
+                                        has_nan=True)
                 cat_idx = self.meta[matches].index
                 keep_col = (self.data[META_IDX].set_index(META_IDX)
                                 .index.isin(cat_idx))
 
             elif col == 'variable':
                 level = filters['level'] if 'level' in filters else None
-                keep_col = pattern_match(self.data[col], values, level, regexp)
+                keep_col = pattern_match(self._data.index.get_level_values(3),
+                                         values, level, regexp)
 
             elif col == 'year':
                 _data = self.data[col] if self.time_col != 'time' \
@@ -1339,7 +1369,8 @@ class IamDataFrame(object):
 
             elif col == 'level':
                 if 'variable' not in filters.keys():
-                    keep_col = find_depth(self.data['variable'], level=values)
+                    keep_col = find_depth(self._data.index.get_level_values(3),
+                                          level=values)
                 else:
                     continue
 
@@ -1792,6 +1823,11 @@ def _make_index(df, cols=META_IDX):
     return pd.MultiIndex.from_tuples(index, names=tuple(cols))
 
 
+def _empty_iamframe(index):
+    """Return an empty IamDataFrame with the correct index columns"""
+    return IamDataFrame(pd.DataFrame([], columns=index))
+
+
 def validate(df, criteria={}, exclude_on_fail=False, **kwargs):
     """Validate scenarios using criteria on timeseries values
 
@@ -1918,7 +1954,7 @@ def filter_by_meta(data, df, join_meta=False, **kwargs):
     data = data.copy()
     idx = list(data.index.names) if not data.index.names == [None] else None
     data = data.reset_index().set_index(META_IDX)
-    meta = meta.loc[meta.index.intersection(data.index)]
+    meta = meta.loc[meta.index.intersection(data.index).drop_duplicates()]
     meta.index.names = META_IDX
     if apply_filter:
         data = data.loc[meta.index]

@@ -110,72 +110,6 @@ def test_init_df_with_extra_col(test_pd_df):
                                   tdf, check_like=True)
 
 
-def test_init_datetime(test_pd_df):
-    tdf = test_pd_df.copy()
-    tmin = datetime.datetime(2005, 6, 17)
-    tmax = datetime.datetime(2010, 6, 17)
-    tdf = tdf.rename(
-        {
-            2005: tmin,
-            2010: tmax,
-        },
-        axis="columns"
-    )
-
-    df = IamDataFrame(tdf)
-
-    assert df["time"].max() == tmax
-    assert df["time"].min() == tmin
-
-
-@pytest.mark.xfail(reason=(
-    "pandas datetime is limited to the time period of ~1677-2262, see "
-    "https://stackoverflow.com/a/37226672"
-))
-def test_init_datetime_long_timespan(test_pd_df):
-    tdf = test_pd_df.copy()
-    tmin = datetime.datetime(2005, 6, 17)
-    tmax = datetime.datetime(3005, 6, 17)
-    tdf = tdf.rename(
-        {
-            2005: tmin,
-            2010: tmax,
-        },
-        axis="columns"
-    )
-
-    df = IamDataFrame(tdf)
-
-    assert df["time"].max() == tmax
-    assert df["time"].min() == tmin
-
-
-def test_init_datetime_subclass_long_timespan(test_pd_df):
-    class TempSubClass(IamDataFrame):
-        def _format_datetime_col(self):
-            # the subclass does not try to coerce the datetimes to pandas
-            # datetimes, instead simply leaving the time column as object type,
-            # so we don't run into the problem of pandas limited time period as
-            # discussed in https://stackoverflow.com/a/37226672
-            pass
-
-    tdf = test_pd_df.copy()
-    tmin = datetime.datetime(2005, 6, 17)
-    tmax = datetime.datetime(3005, 6, 17)
-    tdf = tdf.rename(
-        {
-            2005: tmin,
-            2010: tmax,
-        },
-        axis="columns"
-    )
-
-    df = TempSubClass(tdf)
-
-    assert df["time"].max() == tmax
-    assert df["time"].min() == tmin
-
-
 def test_init_empty_message(test_pd_df, caplog):
     IamDataFrame(data=df_empty)
     drop_message = (
@@ -262,9 +196,16 @@ def test_region(test_df):
 
 
 def test_variable(test_df):
-    exp = pd.Series(
-        data=['Primary Energy', 'Primary Energy|Coal'], name='variable')
+    exp = pd.Series(data=['Primary Energy', 'Primary Energy|Coal'],
+                    name='variable')
     pd.testing.assert_series_equal(test_df.variables(), exp)
+
+
+def test_variable_unit(test_df):
+    exp = pd.DataFrame(
+        [['Primary Energy', 'EJ/yr'], ['Primary Energy|Coal', 'EJ/yr']],
+        columns = ['variable', 'unit'])
+    pd.testing.assert_frame_equal(test_df.variables(include_units=True), exp)
 
 
 def test_variable_unit(test_df):
@@ -384,7 +325,7 @@ def test_filter_hour(test_df, test_hour):
     if "year" in test_df.data.columns:
         error_msg = re.escape("filter by `hour` not supported")
         with pytest.raises(ValueError, match=error_msg):
-            obs = test_df.filter(hour=test_hour)
+            test_df.filter(hour=test_hour)
     else:
         obs = test_df.filter(hour=test_hour)
         test_hour = [test_hour] if isinstance(test_hour, int) else test_hour
@@ -392,7 +333,7 @@ def test_filter_hour(test_df, test_hour):
                          .apply(lambda x: x.hour).isin(test_hour))
         expected = test_df.data["time"].loc[expected_rows].unique()
 
-        unique_time = obs['time'].unique()
+        unique_time = np.array(obs['time'].unique(), dtype=np.datetime64)
         npt.assert_array_equal(unique_time, expected)
 
 
@@ -407,7 +348,7 @@ def test_filter_time_exact_match(test_df):
         obs = test_df.filter(time=datetime.datetime(2005, 6, 17))
         expected = np.array(pd.to_datetime('2005-06-17T00:00:00.0'),
                             dtype=np.datetime64)
-        unique_time = obs['time'].unique()
+        unique_time = np.array(obs['time'].unique(), dtype=np.datetime64)
         assert len(unique_time) == 1
         assert unique_time[0] == expected
 
@@ -495,7 +436,7 @@ def test_filter_time_range_hour(test_df, hour_range):
                          .apply(lambda x: x.hour).isin(hour_range))
         expected = test_df.data["time"].loc[expected_rows].unique()
 
-        unique_time = obs['time'].unique()
+        unique_time = np.array(obs['time'].unique(), dtype=np.datetime64)
         npt.assert_array_equal(unique_time, expected)
 
 
@@ -817,8 +758,9 @@ def test_filter_by_int(test_df):
 
 def _r5_regions_exp(df):
     df = df.filter(region='World', keep=False)
-    df['region'] = 'R5MAF'
-    return sort_data(df.data, df._LONG_IDX)
+    data = df.data
+    data['region'] = 'R5MAF'
+    return sort_data(data, df._LONG_IDX)
 
 
 def test_map_regions_r5(reg_df):
