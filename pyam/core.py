@@ -349,6 +349,9 @@ class IamDataFrame(object):
         index = [index] if isstr(index) else index
         columns = [columns] if isstr(columns) else columns
 
+        if values != 'value':
+            raise ValueError("This method only supports `values='value'`!")
+
         df = self._data
 
         # allow 'aggfunc' to be passed as string for easier user interface
