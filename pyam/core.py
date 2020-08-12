@@ -382,17 +382,30 @@ class IamDataFrame(object):
             raise ValueError(
                 'The `time` argument `{}` is not an integer'.format(time)
             )
+        
         index = [i for i in self._LONG_IDX if i not in [self.time_col]]
-        df = self.pivot_table(index=index, columns=[self.time_col],
-                              values='value', aggfunc=np.sum)
-        # drop time-rows where values are already defined
-        if time in df.columns:
-            df = df[np.isnan(df[time])]
-        fill_values = df.apply(fill_series, raw=False, axis=1, time=time)
-        fill_values = fill_values.dropna().reset_index()
-        fill_values = fill_values.rename(columns={0: "value"})
-        fill_values[self.time_col] = time
-        self.data = self.data.append(fill_values, ignore_index=True)
+        grouped = self._data.groupby(level=index)
+        interpolate_at = time
+        multi_index_dict = {}
+
+        grouped = self._data.groupby(level=index)
+
+        for a, key in grouped:
+            year = [y for y in key.index.get_level_values('year')]
+            if year[-1] > interpolate_at and year[0] < interpolate_at and interpolate_at not in year:
+                model_result = [x for x in key]
+                for i in range (len(year)):
+                    if year[i] > interpolate_at:
+                        if i != 0:
+                            p = year[i-1]
+                            n = year[i]
+                            interpolated_value = ((n - interpolate_at) * model_result[i-1] + (interpolate_at - p) * model_result[i]) / (n - p)
+                            break
+                new_key = a+(interpolate_at,)
+                print(new_key)
+                multi_index_dict[new_key] = interpolated_value
+        interpolated = pd.Series(multi_index_dict, name='value')
+        self._data = self._data.append(interpolated).sort_index()
 
     def swap_time_for_year(self, inplace=False):
         """Convert the `time` column to `year`.
