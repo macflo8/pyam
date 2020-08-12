@@ -392,18 +392,20 @@ class IamDataFrame(object):
 
         for a, key in grouped:
             year = [y for y in key.index.get_level_values('year')]
-            if year[-1] > interpolate_at and year[0] < interpolate_at and interpolate_at not in year:
-                model_result = [x for x in key]
+            if (year[-1] > interpolate_at and year[0] < interpolate_at 
+            and interpolate_at not in year):
+                x = [x for x in key]
                 for i in range (len(year)):
                     if year[i] > interpolate_at:
                         if i != 0:
                             p = year[i-1]
                             n = year[i]
-                            interpolated_value = ((n - interpolate_at) * model_result[i-1] + (interpolate_at - p) * model_result[i]) / (n - p)
+                            value = (((n - interpolate_at) * x[i-1]
+                                + (interpolate_at - p) * x[i]) / (n - p))
                             break
                 new_key = a+(interpolate_at,)
                 print(new_key)
-                multi_index_dict[new_key] = interpolated_value
+                multi_index_dict[new_key] = value
         interpolated = pd.Series(multi_index_dict, name='value')
         self._data = self._data.append(interpolated).sort_index()
 
