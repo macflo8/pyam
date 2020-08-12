@@ -385,27 +385,26 @@ class IamDataFrame(object):
         
         index = [i for i in self._LONG_IDX if i not in [self.time_col]]
         grouped = self._data.groupby(level=index)
-        interpolate_at = time
         multi_index_dict = {}
-
-        grouped = self._data.groupby(level=index)
-
-        for a, key in grouped:
-            year = [y for y in key.index.get_level_values('year')]
-            if (year[-1] > interpolate_at and year[0] < interpolate_at 
-            and interpolate_at not in year):
-                x = [x for x in key]
+        #iterate through groups and interpolate at `time`
+        for group_keys, values in grouped:
+            year = [y for y in values.index.get_level_values(self.time_col)]
+            if (year[-1] > time and year[0] < time 
+                    and time not in year):
+                x = [x for x in values]
                 for i in range (len(year)):
-                    if year[i] > interpolate_at:
+                    if year[i] > time:
                         if i != 0:
                             p = year[i-1]
                             n = year[i]
-                            value = (((n - interpolate_at) * x[i-1]
-                                + (interpolate_at - p) * x[i]) / (n - p))
+                            value = (((n - time) * x[i-1]
+                                + (time - p) * x[i]) / (n - p))
                             break
-                new_key = a+(interpolate_at,)
-                print(new_key)
+                groups_list = list(group_keys)
+                groups_list.insert(len(group_keys)-len(self.extra_cols), time)
+                new_key = tuple(groups_list)
                 multi_index_dict[new_key] = value
+
         interpolated = pd.Series(multi_index_dict, name='value')
         self._data = self._data.append(interpolated).sort_index()
 
