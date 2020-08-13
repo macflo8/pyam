@@ -386,27 +386,23 @@ class IamDataFrame(object):
         index = [i for i in self._LONG_IDX if i not in [self.time_col]]
         grouped = self._data.groupby(level=index)
         multi_index_dict = {}
-        #iterate through groups and interpolate at `time`
-        for group_keys, values in grouped:
-            year = [y for y in values.index.get_level_values(self.time_col)]
-            if (year[-1] > time and year[0] < time 
-                    and time not in year):
-                x = [x for x in values]
-                for i in range (len(year)):
-                    if year[i] > time:
-                        if i != 0:
-                            p = year[i-1]
-                            n = year[i]
-                            value = (((n - time) * x[i-1]
-                                + (time - p) * x[i]) / (n - p))
-                            break
-                groups_list = list(group_keys)
-                groups_list.insert(len(group_keys)-len(self.extra_cols), time)
-                new_key = tuple(groups_list)
-                multi_index_dict[new_key] = value
+        
+        #position where `time` should be inserted in index
+        insert_pos = len(self._data.index.names)-1-len(self.extra_cols)
 
-        interpolated = pd.Series(multi_index_dict, name='value')
-        self._data = self._data.append(interpolated).sort_index()
+        #iterate through and interpolate if not in timeseries group
+        for group_keys, values in grouped:
+            if time not in values.index.get_level_values(self.time_col):
+                x = pd.Series(list(values), index=list(values.index
+                    .get_level_values(self.time_col)))
+                new_key = (group_keys[:insert_pos] 
+                            + (time,) 
+                            + group_keys[insert_pos:])
+                multi_index_dict[new_key] = fill_series(x, time)
+
+        fill_values = pd.Series(multi_index_dict, name='value')
+        fill_values.dropna(inplace=True)
+        self._data = self._data.append(fill_values).sort_index()
 
     def swap_time_for_year(self, inplace=False):
         """Convert the `time` column to `year`.
