@@ -357,14 +357,14 @@ class IamDataFrame(object):
         # allow 'aggfunc' to be passed as string for easier user interface
         if isstr(aggfunc):
             if aggfunc == 'count':
-                df = self._data.groupby(index + columns, as_index=False).count()
+                df = self._data.groupby(index + columns).count()
                 fill_value = 0
             elif aggfunc == 'mean':
-                df = self._data.groupby(index + columns, as_index=False).mean()\
+                df = self._data.groupby(index + columns).mean()\
                     .round(2)
                 fill_value = 0 if style == 'heatmap' else ""
             elif aggfunc == 'sum':
-                df = self._data.groupby(index + columns, as_index=False).sum()
+                df = self._data.groupby(index + columns).sum()
                 fill_value = 0 if style == 'heatmap' else ""
 
         df = df.unstack(level=columns, fill_value=fill_value)
