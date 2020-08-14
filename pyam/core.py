@@ -601,11 +601,11 @@ class IamDataFrame(object):
                           ('linestyle', linestyle)]:
             if arg:
                 run_control().update({kind: {name: {value: arg}}})
-
         # find all data that matches categorization
-        rows = _apply_criteria(self.data, criteria,
+        rows = _apply_criteria(self._data, criteria,
                                in_range=True, return_test='all')
-        idx = _meta_idx(rows)
+        rows1 = rows.index.to_frame()
+        idx = _meta_idx(rows1)
 
         if len(idx) == 0:
             logger.info("No scenarios satisfy the criteria")
@@ -682,15 +682,14 @@ class IamDataFrame(object):
         exclude_on_fail : bool, optional
             flag scenarios failing validation as `exclude: True`
         """
-        df = _apply_criteria(self.data, criteria, in_range=False)
+        df = _apply_criteria(self._data, criteria, in_range=False)
 
         if not df.empty:
             msg = '{} of {} data points do not satisfy the criteria'
             logger.info(msg.format(len(df), len(self.data)))
 
             if exclude_on_fail and len(df) > 0:
-                self._exclude_on_fail(df)
-
+                self._exclude_on_fail(df.to_frame().reset_index())
             return df
 
     def rename(self, mapping=None, inplace=False, append=False,
@@ -1796,13 +1795,68 @@ def _check_rows(rows, check, in_range=True, return_test='any'):
     return ret
 
 
+def _check_rows_series(rows, check, in_range=True, return_test='any'):
+    """Check all rows to be in/out of a certain range and provide testing on
+    return values based on provided conditions
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        data rows
+    check : dict
+        dictionary with possible values of 'up', 'lo', and 'year'
+    in_range : bool, optional
+        check if values are inside or outside of provided range
+    return_test : str, optional
+        possible values:
+            - 'any': default, return scenarios where check passes for any entry
+            - 'all': test if all values match checks, if not, return empty set
+    """
+    valid_checks = set(['up', 'lo', 'year'])
+    if not set(check.keys()).issubset(valid_checks):
+        msg = 'Unknown checking type: {}'
+        raise ValueError(msg.format(check.keys() - valid_checks))
+    if 'year' not in rows.index.names:
+        print(rows.index.get_level_values(5).year)
+    if 'year' not in rows.index.names:
+        where_idx = set(rows.index[rows.index.get_level_values('time').year == check['year']]) \
+        if 'year' in check else set(rows.index)
+        rows = rows.loc[list(where_idx)]
+        
+    else:
+        where_idx = set(rows.index[rows.index.get_level_values('year') == check['year']]) \
+        if 'year' in check else set(rows.index)
+        rows = rows.loc[list(where_idx)]
+
+    up_op = rows.values.__le__ if in_range else rows.values.__gt__
+    lo_op = rows.values.__ge__ if in_range else rows.values.__lt__
+
+    check_idx = []
+    for (bd, op) in [('up', up_op), ('lo', lo_op)]:
+        if bd in check:
+            check_idx.append(set(rows.index[op(check[bd])]))
+
+    if return_test == 'any':
+        ret = where_idx & set.union(*check_idx)
+    elif return_test == 'all':
+        ret = where_idx if where_idx == set.intersection(*check_idx) else set()
+    else:
+        raise ValueError('Unknown return test: {}'.format(return_test))
+    return ret
+
 def _apply_criteria(df, criteria, **kwargs):
     """Apply criteria individually to every model/scenario instance"""
     idxs = []
     for var, check in criteria.items():
-        _df = df[df['variable'] == var]
+        if type(df) == (type(pd.Series())):
+            _df = df[df.index.get_level_values('variable')==var]
+        else:
+            _df = df[df['variable'] == var]
         for group in _df.groupby(META_IDX):
-            grp_idxs = _check_rows(group[-1], check, **kwargs)
+            if type(df) == (type(pd.Series())):
+                grp_idxs = _check_rows_series(group[-1], check, **kwargs)
+            else:
+                grp_idxs = _check_rows(group[-1], check, **kwargs)
             idxs.append(grp_idxs)
     df = df.loc[itertools.chain(*idxs)]
     return df
