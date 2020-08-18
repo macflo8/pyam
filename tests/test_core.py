@@ -607,11 +607,12 @@ def test_validate_up(test_df):
             assert obs.index.get_level_values('year').values[0] == 2010
     else:
         exp_time = pd.to_datetime(datetime.datetime(2010, 7, 21))
-        print(exp_time)
         if type(obs) == type(pd.Series()):
-            assert pd.to_datetime(obs.index.get_level_values('time').values[0]).date() == exp_time
+            assert pd.to_datetime(obs.index.get_level_values('time')
+                                    .values[0]).date() == exp_time
         else:
-            assert pd.to_datetime(obs.index.get_level_values('time').values[0]).date() == exp_time
+            assert pd.to_datetime(obs.index.get_level_values('time')
+                                    .values[0]).date() == exp_time
 
     assert list(test_df['exclude']) == [False, False]  # assert none excluded
 
@@ -623,7 +624,8 @@ def test_validate_lo(test_df):
         assert obs.index.get_level_values('year').values[0] == 2005
     else:
         exp_year = pd.to_datetime(datetime.datetime(2005, 6, 17))
-        assert pd.to_datetime(obs.index.get_level_values('time').values[0]).date() == exp_year
+        assert pd.to_datetime(obs.index.get_level_values('time')
+                                .values[0]).date() == exp_year
 
     assert list(obs.index.get_level_values('scenario').values) == ['scen_a']
 
@@ -635,13 +637,13 @@ def test_validate_both(test_df):
         assert list(obs.index.get_level_values('year').values) == [2005, 2010]
     else:
         exp_time = pd.to_datetime(TEST_DTS)
-        print('test',obs.index.levels[5].date)
-        obs.index.set_levels(obs.index.get_level_values('time').normalize(), level = 5)
-        print(pd.to_datetime(obs.index.get_level_values('time').values))
-        print(exp_time)
-        assert (pd.to_datetime(obs.index.get_level_values('time').values).date == exp_time).all()
+        obs.index.set_levels(obs.index.get_level_values('time')
+        .normalize(), level = 5)
+        assert (pd.to_datetime(obs.index.get_level_values('time').values)
+                                .date == exp_time).all()
 
-    assert list(obs.index.get_level_values('scenario').values) == ['scen_a', 'scen_b']
+    assert list((obs.index.get_level_values('scenario').values) 
+                                            == ['scen_a', 'scen_b'])
 
 
 def test_validate_year(test_df):
@@ -663,11 +665,13 @@ def test_validate_top_level(test_df):
     obs = validate(test_df, criteria={'Primary Energy': {'up': 6.0}},
                    exclude_on_fail=True, variable='Primary Energy')
     assert len(obs) == 1
-    if 'year' in test_df.data:
+    if 'year' in test_df._data.index.names:
         assert obs.index.get_level_values('year').values[0] == 2010
     else:
         exp_time = pd.to_datetime(datetime.datetime(2010, 7, 21))
-        assert (pd.to_datetime(obs.index.get_level_values('time').values[0]).date() == exp_time)
+        obs_time = pd.to_datetime(
+                        obs.index.get_level_values('time').values[0]).date()
+        assert (obs_time == exp_time)
     assert list(test_df['exclude']) == [False, True]
 
 
