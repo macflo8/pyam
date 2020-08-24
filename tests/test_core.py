@@ -601,17 +601,10 @@ def test_validate_up(test_df):
                            exclude_on_fail=False)
     assert len(obs) == 1
     if 'year' in test_df.data:
-        if type(obs) == type(pd.Series()):
-            assert obs.index.get_level_values('year').values[0] == 2010
-        else:
-            assert obs.index.get_level_values('year').values[0] == 2010
+        assert obs.index.get_level_values('year').values[0] == 2010
     else:
         exp_time = pd.to_datetime(datetime.datetime(2010, 7, 21))
-        if type(obs) == type(pd.Series()):
-            assert pd.to_datetime(obs.index.get_level_values('time')
-                                    .values[0]).date() == exp_time
-        else:
-            assert pd.to_datetime(obs.index.get_level_values('time')
+        assert pd.to_datetime(obs.index.get_level_values('time')
                                     .values[0]).date() == exp_time
 
     assert list(test_df['exclude']) == [False, False]  # assert none excluded
@@ -638,7 +631,7 @@ def test_validate_both(test_df):
     else:
         exp_time = pd.to_datetime(TEST_DTS)
         obs.index.set_levels(obs.index.get_level_values('time')
-        .normalize(), level = 5)
+                                .normalize(), level = 5)
         assert (pd.to_datetime(obs.index.get_level_values('time').values)
                                 .date == exp_time).all()
 

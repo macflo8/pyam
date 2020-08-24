@@ -604,8 +604,7 @@ class IamDataFrame(object):
         # find all data that matches categorization
         rows = _apply_criteria(self._data, criteria,
                                in_range=True, return_test='all')
-        rows_df = rows.index.to_frame()
-        idx = _meta_idx(rows_df)
+        idx = _meta_idx(rows.index.to_frame())
 
         if len(idx) == 0:
             logger.info("No scenarios satisfy the criteria")
@@ -1770,8 +1769,6 @@ def _check_rows(rows, check, in_range=True, return_test='any'):
         msg = 'Unknown checking type: {}'
         raise ValueError(msg.format(check.keys() - valid_checks))
     if 'year' not in rows.index.names:
-        print(rows.index.get_level_values(5).year)
-    if 'year' not in rows.index.names:
         where_idx = set(rows.index[rows.index.get_level_values('time').year
                                     == check['year']]) \
         if 'year' in check else set(rows.index)
@@ -1804,13 +1801,9 @@ def _apply_criteria(df, criteria, **kwargs):
     """Apply criteria individually to every model/scenario instance"""
     idxs = []
     for var, check in criteria.items():
-        if type(df) == (type(pd.Series())):
-            _df = df[df.index.get_level_values('variable')==var]
+        _df = df[df.index.get_level_values('variable')==var]
         for group in _df.groupby(META_IDX):
-            if type(df) == (type(pd.Series())):
-                grp_idxs = _check_rows(group[-1], check, **kwargs)
-            #else:
-            #    grp_idxs = _check_rows(group[-1], check, **kwargs)
+            grp_idxs = _check_rows(group[-1], check, **kwargs)
             idxs.append(grp_idxs)
     df = df.loc[itertools.chain(*idxs)]
     return df
