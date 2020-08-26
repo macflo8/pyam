@@ -604,7 +604,7 @@ class IamDataFrame(object):
         # find all data that matches categorization
         rows = _apply_criteria(self._data, criteria,
                                in_range=True, return_test='all')
-        idx = _make_index(rows.index.to_frame())
+        idx = _make_index(rows)
 
         if len(idx) == 0:
             logger.info("No scenarios satisfy the criteria")
@@ -688,7 +688,7 @@ class IamDataFrame(object):
             logger.info(msg.format(len(df), len(self.data)))
 
             if exclude_on_fail and len(df) > 0:
-                self._exclude_on_fail(df.to_frame().reset_index())
+                self._exclude_on_fail(df)
             return df
 
     def rename(self, mapping=None, inplace=False, append=False,
@@ -1252,7 +1252,7 @@ class IamDataFrame(object):
 
     def _exclude_on_fail(self, df):
         """Assign a selection of scenarios as `exclude: True` in meta"""
-        idx = df if isinstance(df, pd.MultiIndex) else _meta_idx(df)
+        idx = df if isinstance(df, pd.MultiIndex) else _make_index(df)
         self.meta.loc[idx, 'exclude'] = True
         logger.info('{} non-valid scenario{} will be excluded'
                       .format(len(idx), '' if len(idx) == 1 else 's'))
