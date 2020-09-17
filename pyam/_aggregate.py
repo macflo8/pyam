@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import logging
+import time
 
 from pyam.logging import adjust_log_level
 from pyam.utils import (
@@ -21,7 +22,6 @@ def _aggregate(df, variable, components=None, method=np.sum):
     if islistable(variable) and components is not None:
         raise ValueError('aggregating by list of variables cannot use '
                          'custom components')
-
     mapping = {}
     msg = 'cannot aggregate variable `{}` because it has no components'
     # if single variable
@@ -47,10 +47,29 @@ def _aggregate(df, variable, components=None, method=np.sum):
             for c in _components:
                 mapping[c] = v
 
-    # rename all components to `variable` and aggregate
-    _df = df.data[df._apply_filters(variable=mapping.keys())].copy()
-    _df['variable'].replace(mapping, inplace=True)
-    return _group_and_agg(_df, [], method)
+        # rename all components to `variable` and aggregate
+
+
+    #old approach for performance comparison
+    """
+    start = time.time()
+    _df = df.data[df._apply_filters(variable=mapping.keys())].copy()    
+    _df['variable'].replace(mapping, inplace=True)       
+    x = _group_and_agg(_df, [], method)    
+    print("old approach",time.time()-start)
+    return x
+    """
+
+    start = time.time()
+    _df = df._data[df._apply_filters(variable=mapping.keys())].copy()
+    idx_list = [x for x in _df.index.names]
+    idx_list.remove('variable')
+    _df = _df.groupby(idx_list).agg(_get_method_func(method))    
+    _df = pd.concat([_df], keys=[variable],names=["variable"])
+    _df = _df.reorder_levels(['model', 'scenario', 'region', 'variable', 'unit', 'year']) 
+    print("new approach", time.time()-start)
+    return _df
+    #"""
 
 
 def _aggregate_recursive(df, variable, method=np.sum):
